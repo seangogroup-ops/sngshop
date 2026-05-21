@@ -58,7 +58,7 @@ export default async function handler(req, res) {
   const content = `SNG ${orderId}`;   // nội dung chuyển khoản
 
   // Lưu vào Supabase
-  const { error } = await supabase.from("don_hang").insert({
+  const { error } = await supabase.from("orders").insert({
     order_id:   orderId,
     email:      email.toLowerCase().trim(),
     plan:       plan,
