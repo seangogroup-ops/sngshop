@@ -12,7 +12,7 @@ const supabase = createClient(
 const BANK = {
   bank:    "VietinBank",
   bankId:  "ICB",          // mã VietQR cho VietinBank
-  account: "109887159091",
+  account: "09887159091",
   name:    "HUYNH NHAT TAN HAI",
 };
 
