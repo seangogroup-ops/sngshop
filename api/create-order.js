@@ -75,12 +75,50 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: "Lỗi lưu đơn hàng!" });
   }
 
+  // Gửi email thông báo cho admin
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.default.createTransport({
+      service: "gmail",
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
+    });
+
+    const confirmUrl = `https://sng-shop.vercel.app/admin`;
+    await transporter.sendMail({
+      from: `"SNG Shop" <${process.env.GMAIL_USER}>`,
+      to:   process.env.GMAIL_USER,
+      subject: `[SNG Shop] Đơn mới: ${orderId} - ${planInfo.name} - ${planInfo.price.toLocaleString("vi-VN")}đ`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;">
+          <h2 style="color:#22c55e;">🛒 Đơn hàng mới!</h2>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="padding:8px;color:#666;">Mã đơn</td><td style="padding:8px;font-weight:700;">${orderId}</td></tr>
+            <tr style="background:#f9f9f9;"><td style="padding:8px;color:#666;">Gói</td><td style="padding:8px;">${planInfo.name} (${planInfo.days} ngày)</td></tr>
+            <tr><td style="padding:8px;color:#666;">Số tiền</td><td style="padding:8px;color:#16a34a;font-weight:700;">${planInfo.price.toLocaleString("vi-VN")}đ</td></tr>
+            <tr style="background:#f9f9f9;"><td style="padding:8px;color:#666;">Email khách</td><td style="padding:8px;">${email}</td></tr>
+            <tr><td style="padding:8px;color:#666;">Nội dung CK</td><td style="padding:8px;font-weight:700;color:#f59e0b;">${content}</td></tr>
+          </table>
+          <div style="margin-top:20px;text-align:center;">
+            <a href="${confirmUrl}" style="background:#22c55e;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">
+              Vào trang Admin xác nhận
+            </a>
+          </div>
+        </div>
+      `,
+    });
+  } catch (mailErr) {
+    console.error("Admin notify email error:", mailErr);
+    // Không fail đơn hàng nếu email lỗi
+  }
+
   // Trả về cho frontend
   return res.status(200).json({
-    ok:      true,
+    ok:       true,
     orderId,
-    amount:  planInfo.price,
+    amount:   planInfo.price,
     content,
-    bank:    BANK,
+    planName: planInfo.name,
+    days:     planInfo.days,
+    bank:     BANK,
   });
 }
