@@ -18,17 +18,11 @@ export default async function handler(req, res) {
   if (auth !== 'Bearer ' + process.env.ADMIN_TOKEN)
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
 
-  const { order_id } = req.body;
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ ok: false, error: 'Thiếu id' });
 
-  // Xoá theo order_id (dù null hay có giá trị)
-  let query = supabase.from('orders').delete();
-  if (order_id === null || order_id === 'null' || order_id === undefined) {
-    query = query.is('order_id', null);
-  } else {
-    query = query.eq('order_id', order_id);
-  }
-
-  const { error } = await query;
+  const { error } = await supabase.from('orders').delete().eq('id', id);
   if (error) return res.status(500).json({ ok: false, error: error.message });
 
-  re
+  return res.json({ ok: true });
+}
