@@ -5,6 +5,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// Bắt buộc phải có để Vercel parse req.body
+export const config = {
+  api: { bodyParser: true }
+};
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,7 +23,13 @@ export default async function handler(req, res) {
   if (auth !== 'Bearer ' + process.env.ADMIN_TOKEN)
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
 
-  const { id } = req.body;
+  // Parse body thủ công nếu vẫn là string (fallback)
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+
+  const { id } = body || {};
   if (!id) return res.status(400).json({ ok: false, error: 'Thiếu id' });
 
   const { error } = await supabase.from('orders').delete().eq('id', id);
