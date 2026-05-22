@@ -1,6 +1,3 @@
-// api/list-orders.js
-// Admin lấy danh sách đơn hàng từ Supabase
-
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -10,25 +7,17 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // Kiểm tra admin token
   const token = (req.headers["authorization"] || "").replace("Bearer ", "").trim();
-  if (token !== process.env.ADMIN_TOKEN) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
-  }
+  if (token !== process.env.ADMIN_TOKEN) return res.status(401).json({ ok: false, error: "Unauthorized" });
 
   const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
+    .from("orders").select("*").order("created_at", { ascending: false }).limit(200);
 
-  if (error) {
-    return res.status(500).json({ ok: false, error: "Lỗi lấy dữ liệu" });
-  }
+  if (error) return res.status(500).json({ ok: false, error: "Loi lay du lieu" });
 
   return res.status(200).json({ ok: true, orders: data });
 }
