@@ -6,13 +6,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-webpush.setVapidDetails(
-  'mailto:seangogroup@gmail.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+function initVapid() {
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) return false;
+  webpush.setVapidDetails('mailto:seangogroup@gmail.com', pub, priv);
+  return true;
+}
 
 export async function sendOrderNotification({ order_id, plan_name, plan, email, amount }) {
+  if (!initVapid()) return; // Không có VAPID key thì bỏ qua, không crash
+
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('subscription');
@@ -53,6 +57,9 @@ export default async function handler(req, res) {
   const auth = req.headers.authorization || '';
   if (auth !== 'Bearer ' + process.env.ADMIN_TOKEN)
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
+
+  if (!initVapid())
+    return res.status(500).json({ ok: false, error: 'VAPID keys chưa được cấu hình' });
 
   const { title, body, data } = req.body || {};
   if (!title) return res.status(400).json({ ok: false, error: 'Thiếu title' });
