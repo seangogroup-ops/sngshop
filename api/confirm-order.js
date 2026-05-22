@@ -1,15 +1,13 @@
 // api/confirm-order.js
-// Admin xác nhận đơn -> tạo key ngẫu nhiên -> gửi email cho khách
-
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import { sendOrderNotification } from './notify.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 );
 
-// ── Tạo key ngẫu nhiên dạng XXXX-XXXX-XXXX-XXXX ────────
 function genKey() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const seg = () => Array.from({ length: 4 }, () =>
@@ -18,7 +16,6 @@ function genKey() {
   return `${seg()}-${seg()}-${seg()}-${seg()}`;
 }
 
-// ── Gửi email cho khách ─────────────────────────────────
 async function sendKeyEmail({ to, orderId, planName, days, key }) {
   const transporter = nodemailer.createTransport({
     service: "gmail",
@@ -73,57 +70,55 @@ async function sendKeyEmail({ to, orderId, planName, days, key }) {
   });
 }
 
-// ── Handler ─────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  if (req.method !== "POST") {
+  if (req.method !== "POST")
     return res.status(405).json({ ok: false, error: "Method not allowed" });
-  }
 
-  // Kiểm tra admin token
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace("Bearer ", "").trim();
-  if (token !== process.env.ADMIN_TOKEN) {
+  if (token !== process.env.ADMIN_TOKEN)
     return res.status(401).json({ ok: false, error: "Unauthorized" });
-  }
 
   const { order_id } = req.body || {};
-  if (!order_id) {
+  if (!order_id)
     return res.status(400).json({ ok: false, error: "Thiếu order_id" });
-  }
 
-  // Lấy thông tin đơn hàng
   const { data: order, error: fetchErr } = await supabase
     .from("orders")
     .select("*")
     .eq("order_id", order_id)
     .single();
 
-  if (fetchErr || !order) {
+  if (fetchErr || !order)
     return res.status(404).json({ ok: false, error: "Không tìm thấy đơn hàng" });
-  }
-  if (order.status === "confirmed") {
-    return res.status(400).json({ ok: false, error: "Đơn đã được xác nhận rồi" });
-  }
 
-  // Tạo key ngẫu nhiên
+  if (order.status === "confirmed")
+    return res.status(400).json({ ok: false, error: "Đơn đã được xác nhận rồi" });
+
   const key = genKey();
   const confirmed_at = new Date().toISOString();
 
-  // Cập nhật Supabase
   const { error: updateErr } = await supabase
     .from("orders")
     .update({ status: "confirmed", key, confirmed_at })
     .eq("order_id", order_id);
 
-  if (updateErr) {
-    console.error("Supabase update error:", updateErr);
+  if (updateErr)
     return res.status(500).json({ ok: false, error: "Lỗi cập nhật đơn hàng" });
-  }
+
+  // Gửi push notification cho admin
+  await sendOrderNotification({
+    order_id:  order.order_id,
+    plan_name: order.plan_name,
+    plan:      order.plan,
+    email:     order.email,
+    amount:    order.amount,
+  }).catch(() => {});
 
   // Gửi email cho khách
   try {
@@ -135,8 +130,6 @@ export default async function handler(req, res) {
       key,
     });
   } catch (mailErr) {
-    console.error("Email error:", mailErr);
-    // Vẫn trả về OK vì đơn đã confirm, admin tự gửi key thủ công nếu cần
     return res.status(200).json({
       ok: true, key,
       warning: "Đơn đã xác nhận nhưng gửi email thất bại. Gửi key thủ công cho khách.",
